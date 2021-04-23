@@ -18,13 +18,14 @@ library(ggpubr)
 library("ggthemes")
 library(Rtsne)
 library(shinyBS)
+library(ggplotify)
 
 
 ui <- fluidPage(
   theme = shinytheme("cosmo"),
   titlePanel("RNA-seq analysis & Visualization"),
   sidebarPanel(
-    selectInput("gct",label = h3("Choose a experiment to browse"),c("KP_Longterm_Exh","Scottbrowne_Exh","gse65850_Tox_ko","GSE58596","GSE83482","GSE89307_schietinger","KP_JG_Flu_PDL1L2KO","EMTAB_6214","GSE84820","GSE83978","AHUA_C1IpiC1Pembro","GSE99531","GSE94581_Vignali_Tregs","AHUA_PBMC_4cycles_Pembro_RNAseq"),selected="GSE94581_Vignali_Tregs")
+    selectInput("gct",label = h3("Choose a experiment to browse"),c("KP_Longterm_Exh","Scottbrowne_Exh","gse65850_Tox_ko","GSE58596","GSE83482","GSE89307_schietinger","KP_JG_Flu_PDL1L2KO","EMTAB_6214","GSE84820","GSE83978","AHUA_C1IpiC1Pembro","GSE99531","GSE94581_Vignali_Tregs","AHUA_PBMC_4cycles_Pembro_RNAseq","JC_Tex_4Subsets"),selected="JC_Tex_4Subsets")
     , bsTooltip("gct", "Browse through RNAseq datasets by name and choose your dataset of interest",
                 "right", options = list(container = "body")),
     uiOutput("groups_input"),
@@ -41,10 +42,10 @@ ui <- fluidPage(
       label = h4("Enter p-value cutoff"),
       value = 0.05,max = 1
     ),
-    p(strong("Term analysis options")),
-    selectInput("species", label = h4("Select Organism for Term analysis"), 
-                choices = list("Human" = "Hs", "Mouse" = "Mm"), 
-                selected = "Mm"),
+   # p(strong("Term analysis options")),
+    #selectInput("species", label = h4("Select Organism for Term analysis"), 
+    #            choices = list("Human" = "Hs", "Mouse" = "Mm"), 
+    #            selected = "Mm"),
     actionButton("runButton", "Run!"),
     br(),
     textOutput("currentTime")
@@ -52,9 +53,9 @@ ui <- fluidPage(
   mainPanel(
     tabsetPanel(
     type = "tabs",
-    tabPanel("Gene expression",plotOutput("gexp",width = "500px",height="500px")
+    tabPanel("Gene expression",plotlyOutput("gexp",width = "500px",height="500px")
     ),
-    tabPanel("Custom Heatmap",plotOutput("custom_heatmap",height=600)),
+    tabPanel("Custom Heatmap",plotlyOutput("custom_heatmap",height=400,width=400)),
       tabPanel("PCA plot", plotOutput("pca",width = "800px",height = "400px")),
       tabPanel("t-SNE plot", plotOutput("tsne",width = "600px",height = "400px"))
     ),
@@ -65,19 +66,19 @@ ui <- fluidPage(
     tabPanel("DE Genes list & Statistics", dataTableOutput("table"))
   ),
   tabsetPanel(
-    type = "tabs",
-     tabPanel("Term enrichment summary",splitLayout(
-      plotOutput("plot1"),
-      plotOutput("plot2")
-    ),width=1000,height=1000),
-     tabPanel("Term enrichment list for UP genes", dataTableOutput("GO_table_UP")),
-     tabPanel("Term enrichment list for DOWN genes", dataTableOutput("GO_table_DOWN")),
+    #type = "tabs",
+     #tabPanel("Term enrichment summary",splitLayout(
+     # plotOutput("plot1"),
+     # plotOutput("plot2")
+    #),width=1000,height=1000),
+    # tabPanel("Term enrichment list for UP genes", dataTableOutput("GO_table_UP")),
+    # tabPanel("Term enrichment list for DOWN genes", dataTableOutput("GO_table_DOWN")),
     tabPanel("Heatmap of Top 100 significant genes",plotOutput("p_heatmap",width = "600px",height = "1200px")),
     tabPanel("Heatmap of Top 100 significant genes in all samples",plotOutput("p_heatmap2",width = "600px",height = "1200px"))
     # tabPanel("Top GSEA hits",plotOutput("gseaplot",width="70%",height="400px"))
   ),
-  downloadButton('downloadData', 'Download gene statistics'),
-  downloadButton('downloadData_GO', 'Download Term enrichment result')
+  downloadButton('downloadData', 'Download gene statistics')
+  #downloadButton('downloadData_GO', 'Download Term enrichment result')
 )
 )
 server <- function(input,output,session) {
@@ -158,8 +159,9 @@ server <- function(input,output,session) {
       
       colnames(exp_df_gene)<-c("sample","Group","count")
       gene_title<-paste0(gene_id,"/",gene)
-      ggplot(exp_df_gene[exp_df_gene$Group %in% groups ,], aes(x=Group, y=count, color=Group))  +ylab("log2 Normalized Counts") +geom_point(position=position_jitter(width=.1,height=0), size=4) + theme_bw() + ggtitle(gene_title)+theme(axis.text.x = element_text(size=12,angle = 45, hjust = 1,face="bold"),legend.position="none",plot.title = element_text(lineheight=.8,hjust=0.5, face="bold"),axis.text.y = element_text(size=12,face="bold"))
-    }
+      p=ggplot(exp_df_gene[exp_df_gene$Group %in% groups ,], aes(x=Group, y=count, color=Group))  +ylab("log2 Normalized Counts") +geom_point(position=position_jitter(width=.1,height=0), size=4) + theme_bw() + ggtitle(gene_title)+theme(axis.text.x = element_text(size=12,angle = 45, hjust = 1,face="bold"),legend.position="none",plot.title = element_text(lineheight=.8,hjust=0.5, face="bold"),axis.text.y = element_text(size=12,face="bold"))
+      ggplotly(p)
+      }
   }
   
   
@@ -230,7 +232,7 @@ server <- function(input,output,session) {
     port.voom_results
   })
  
-  output$gexp<-renderPlot({
+  output$gexp<-renderPlotly({
     if (is.null(input$gct) )
       return(NULL)
     if (is.null(input$groups_keep) )
@@ -344,7 +346,7 @@ server <- function(input,output,session) {
     mdata
     
   })
-  output$custom_heatmap <- renderPlot({ 
+  output$custom_heatmap <- renderPlotly({ 
     if (is.null(input$gct) )
       return(NULL)
     if (is.null(input$groups_keep) )
@@ -378,13 +380,14 @@ server <- function(input,output,session) {
     expdes_custom<-Expdes[Expdes[,2] %in% groups_keep,]
     idx<-intersect(rownames(expdes_custom),samples_interest)
     expdes_custom$sample<-NULL
-    pheatmap(input_data[,as.character(idx)],cellwidth = 8,cellheight = 10,cluster_cols  = TRUE,scale = "row",annotation_col = expdes_custom)
-  })
+    #pheatmap(input_data[,as.character(idx)],cellwidth = 8,cellheight = 10,cluster_cols  = TRUE,scale = "row",annotation_col = expdes_custom)
+  heatmaply(input_data[,as.character(idx)],scale="row",col_side_colors =expdes_custom,fontsize_col = 0.1)
+    })
   
   output$vplot<-renderPlotly({
     deg_result<-gene_stats()
     
-    vobj<-volcanor(deg_result,snp="gene")
+    vobj<-volcanor(deg_result,gene="geneSymbol",snp="gene")
     
     #volcanoly(vobj,genomewideline= 1.301) %>%
      # saveWidget(file="volcanoly_test.html",selfcontained = TRUE)
